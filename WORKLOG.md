@@ -1,0 +1,12 @@
+# pop service WORKLOG
+
+This log explains what the POP service does and why changes were made so future contributors can understand context quickly.
+
+## Service overview
+- Go HTTP API that records "Proof of Play" events for kiosks (poster metadata, kiosk location, host, type, etc.) into the `pop` table.
+- Exposes REST endpoints under `cmd/server` via handlers in `internal/handlers` to create records, list/filter them, fetch stats, and generate trend data for dashboards (@pop/internal/handlers/pop_handler.go).
+- Data access is encapsulated in `internal/repository`, which builds SQL for inserts, paginated queries, stats, and trend aggregations (@pop/internal/repository/pop_repository.go).
+
+## 2025-12-29
+- Added click capture support: migrations now add nullable `click_x` / `click_y` columns, models/handlers parse optional coordinates, and repository insert/list/search logic persists them (@pop/migrations/0004_click_position.sql, @pop/internal/models/pop.go, @pop/internal/repository/pop_repository.go, @pop/internal/handlers/pop_handler.go).
+- Documented the POP filtering guidance inside tool-gateway instructions (POP totals must use `popList` instead of `popSearch`), so POP endpoints now serve gateway-based analytics workflows.
