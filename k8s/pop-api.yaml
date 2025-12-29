@@ -6,7 +6,7 @@ data:
   POP_DB_PASSWORD: "Asterisk@123"
   POP_DB_NAME: "pop"
   RATE_LIMIT_WINDOW_SECONDS: "60"
-  RATE_LIMIT_MAX: "120"
+  RATE_LIMIT_MAX: "50"
 kind: ConfigMap
 metadata:
   name: pop-api
