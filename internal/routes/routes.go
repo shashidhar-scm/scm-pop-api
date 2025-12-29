@@ -10,8 +10,9 @@ func RegisterPopRoutes(mux *http.ServeMux, h *handlers.PopHandler) {
 
 	// 🔥 Root health check
 	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusOK)
-		w.Write([]byte("Application Up and Running"))
+		_, _ = w.Write([]byte(`{"status":"ok","message":"Application Up and Running"}`))
 	})
 
 	mux.HandleFunc("/pop", func(w http.ResponseWriter, r *http.Request) {

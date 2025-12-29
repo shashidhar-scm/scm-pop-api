@@ -9,9 +9,9 @@ import (
 
 	"pop/internal/db"
 	"pop/internal/handlers"
+	"pop/internal/middleware"
 	"pop/internal/repository"
 	"pop/internal/routes"
-	"pop/internal/middleware"
 )
 
 func main() {
@@ -36,8 +36,9 @@ func main() {
 	mux := http.NewServeMux()
 	routes.RegisterPopRoutes(mux, h)
 
-	// Wrap entire router with global CORS
-	handler := middleware.CORS(mux)
+	// Wrap entire router with rate limit then global CORS
+	handler := middleware.RateLimit(mux)
+	handler = middleware.CORS(handler)
 
 	addr := ":8080"
 	fmt.Println("starting API server on", addr)
