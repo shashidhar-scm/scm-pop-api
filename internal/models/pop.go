@@ -5,6 +5,7 @@ import "time"
 type PopInput struct {
 	PosterName      string    `json:"poster_name"`
 	PosterID        string    `json:"poster_id"`
+	CampaignID      string    `json:"campaign_id,omitempty"`
 	HostName        string    `json:"host_name"`
 	KioskName       string    `json:"kiosk_name"`
 	PosterType      string    `json:"poster_type"`

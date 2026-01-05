@@ -35,6 +35,14 @@ func RegisterPopRoutes(mux *http.ServeMux, h *handlers.PopHandler) {
 		w.WriteHeader(http.StatusMethodNotAllowed)
 	})
 
+	mux.HandleFunc("/pop/impressions", func(w http.ResponseWriter, r *http.Request) {
+		if r.Method == http.MethodGet {
+			h.Impressions(w, r)
+			return
+		}
+		w.WriteHeader(http.StatusMethodNotAllowed)
+	})
+
 	mux.HandleFunc("/pop/trend", func(w http.ResponseWriter, r *http.Request) {
 		if r.Method == http.MethodGet {
 			h.Trend(w, r)

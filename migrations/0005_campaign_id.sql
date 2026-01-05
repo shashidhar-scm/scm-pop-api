@@ -1,0 +1,2 @@
+ALTER TABLE pop
+    ADD COLUMN IF NOT EXISTS campaign_id VARCHAR(50);

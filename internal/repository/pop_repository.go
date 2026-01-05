@@ -26,6 +26,7 @@ type PopFilter struct {
 	PosterType      string
 	PosterName      string
 	PosterID        string
+	CampaignID      string
 	PosterCreatedBy int
 	Type            string
 	Page            int
@@ -65,11 +66,68 @@ type PopTrendPoint struct {
 	Count int64     `json:"count"`
 }
 
+type PosterImpression struct {
+	PosterID    string
+	PosterName  string
+	Impressions int64
+	PlayTime    int64
+}
+
+func (r *PopRepository) PosterImpressionsByCampaign(ctx context.Context, campaignID string) ([]PosterImpression, error) {
+	query := `
+		SELECT
+			poster_id,
+			COALESCE(MAX(poster_name), '') AS poster_name,
+			COALESCE(SUM(COALESCE(value, 0)), 0) AS impressions,
+			COALESCE(SUM(COALESCE(play_count, 0)), 0) AS play_time
+		FROM pop
+		WHERE campaign_id = $1
+		GROUP BY poster_id
+		ORDER BY impressions DESC
+	`
+
+	rows, err := r.db.QueryContext(ctx, query, campaignID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var result []PosterImpression
+	for rows.Next() {
+		var pi PosterImpression
+		if err := rows.Scan(&pi.PosterID, &pi.PosterName, &pi.Impressions, &pi.PlayTime); err != nil {
+			return nil, err
+		}
+		result = append(result, pi)
+	}
+
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+
+	return result, nil
+}
+
+func (r *PopRepository) TotalImpressionsByCampaign(ctx context.Context, campaignID string) (int64, error) {
+	query := `
+		SELECT COALESCE(SUM(COALESCE(value, 0)), 0)
+		FROM pop
+		WHERE campaign_id = $1
+	`
+
+	var total int64
+	if err := r.db.QueryRowContext(ctx, query, campaignID).Scan(&total); err != nil {
+		return 0, err
+	}
+	return total, nil
+}
+
 func (r *PopRepository) Create(ctx context.Context, in models.PopInput) (int64, error) {
 	query := `
 		INSERT INTO pop (
 			poster_name,
 			poster_id,
+			campaign_id,
 			host_name,
 			kiosk_name,
 			poster_type,
@@ -86,7 +144,7 @@ func (r *PopRepository) Create(ctx context.Context, in models.PopInput) (int64, 
 			type,
 			url
 		) VALUES (
-			$1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17
+			$1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18
 		) RETURNING id
 	`
 
@@ -96,6 +154,7 @@ func (r *PopRepository) Create(ctx context.Context, in models.PopInput) (int64, 
 		query,
 		in.PosterName,
 		in.PosterID,
+		in.CampaignID,
 		in.HostName,
 		in.KioskName,
 		in.PosterType,
@@ -124,6 +183,7 @@ func (r *PopRepository) List(ctx context.Context, f PopFilter) ([]models.PopInpu
 		SELECT
 			poster_name,
 			poster_id,
+			campaign_id,
 			host_name,
 			kiosk_name,
 			poster_type,
@@ -172,6 +232,7 @@ func (r *PopRepository) List(ctx context.Context, f PopFilter) ([]models.PopInpu
 	add("poster_type = $%d", f.PosterType)
 	add("poster_name = $%d", f.PosterName)
 	add("poster_id = $%d", f.PosterID)
+	add("campaign_id = $%d", f.CampaignID)
 	addInt("poster_created_by = $%d", f.PosterCreatedBy)
 	add("type = $%d", f.Type)
 
@@ -222,6 +283,7 @@ func (r *PopRepository) List(ctx context.Context, f PopFilter) ([]models.PopInpu
 		if err := rows.Scan(
 			&m.PosterName,
 			&m.PosterID,
+			&m.CampaignID,
 			&m.HostName,
 			&m.KioskName,
 			&m.PosterType,
@@ -258,6 +320,7 @@ func (r *PopRepository) Search(ctx context.Context, q string) ([]models.PopInput
 		SELECT
 			poster_name,
 			poster_id,
+			campaign_id,
 			host_name,
 			kiosk_name,
 			poster_type,
@@ -277,6 +340,7 @@ func (r *PopRepository) Search(ctx context.Context, q string) ([]models.PopInput
 		WHERE
 			poster_name ILIKE $1 OR
 			poster_id ILIKE $1 OR
+			campaign_id ILIKE $1 OR
 			host_name ILIKE $1 OR
 			kiosk_name ILIKE $1 OR
 			poster_type ILIKE $1 OR
@@ -301,6 +365,7 @@ func (r *PopRepository) Search(ctx context.Context, q string) ([]models.PopInput
 		if err := rows.Scan(
 			&m.PosterName,
 			&m.PosterID,
+			&m.CampaignID,
 			&m.HostName,
 			&m.KioskName,
 			&m.PosterType,

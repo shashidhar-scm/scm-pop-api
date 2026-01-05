@@ -46,6 +46,19 @@ type PopTrendResponse struct {
 	Points    []repository.PopTrendPoint `json:"points"`
 }
 
+type PosterImpressionResponse struct {
+	PosterID    string `json:"poster_id"`
+	PosterName  string `json:"poster_name"`
+	Impressions int64  `json:"impressions"`
+	PlayTime    int64  `json:"play_time"`
+}
+
+type PopImpressionsResponse struct {
+	CampaignID  string                       `json:"campaign_id"`
+	Impressions int64                        `json:"impressions"`
+	Posters     []PosterImpressionResponse   `json:"posters"`
+}
+
 
 func NewPopHandler(repo *repository.PopRepository) *PopHandler {
 	return &PopHandler{repo: repo}
@@ -130,6 +143,7 @@ func (h *PopHandler) List(w http.ResponseWriter, r *http.Request) {
 		PosterType:      q.Get("poster_type"),
 		PosterName:      q.Get("poster_name"),
 		PosterID:        q.Get("poster_id"),
+		CampaignID:      q.Get("campaign_id"),
 		PosterCreatedBy: qInt(q, "poster_created_by"),
 		Type:            q.Get("type"),
 		Page:            page,
@@ -154,6 +168,51 @@ func (h *PopHandler) List(w http.ResponseWriter, r *http.Request) {
 
 	w.Header().Set("Content-Type", "application/json")
 	_ = json.NewEncoder(w).Encode(resp)
+}
+
+func (h *PopHandler) Impressions(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		w.WriteHeader(http.StatusMethodNotAllowed)
+		return
+	}
+
+	campaignID := strings.TrimSpace(r.URL.Query().Get("campaign_id"))
+	if campaignID == "" {
+		writeError(w, http.StatusBadRequest, "campaign_id query parameter is required")
+		return
+	}
+
+	ctx, cancel := context.WithTimeout(r.Context(), 10*time.Second)
+	defer cancel()
+
+	total, err := h.repo.TotalImpressionsByCampaign(ctx, campaignID)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, "failed to fetch impressions")
+		return
+	}
+
+	posterRows, err := h.repo.PosterImpressionsByCampaign(ctx, campaignID)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, "failed to fetch poster level impressions")
+		return
+	}
+
+	posters := make([]PosterImpressionResponse, 0, len(posterRows))
+	for _, p := range posterRows {
+		posters = append(posters, PosterImpressionResponse{
+			PosterID:    p.PosterID,
+			PosterName:  p.PosterName,
+			Impressions: p.Impressions,
+			PlayTime:    p.PlayTime,
+		})
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	_ = json.NewEncoder(w).Encode(PopImpressionsResponse{
+		CampaignID:  campaignID,
+		Impressions: total,
+		Posters:     posters,
+	})
 }
 
 func (h *PopHandler) Trend(w http.ResponseWriter, r *http.Request) {
