@@ -19,6 +19,48 @@ type PopHandler struct {
 	repo *repository.PopRepository
 }
 
+func parseDateRange(q url.Values) (time.Time, time.Time, error) {
+	now := time.Now().UTC()
+	todayStart := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, time.UTC)
+
+	from := todayStart
+	to := todayStart.AddDate(0, 0, 1)
+
+	preset := strings.ToLower(strings.TrimSpace(q.Get("preset")))
+	if preset == "" {
+		preset = strings.ToLower(strings.TrimSpace(q.Get("range")))
+	}
+	if preset != "" {
+		switch preset {
+		case "current_day", "today":
+			from = todayStart
+			to = todayStart.AddDate(0, 0, 1)
+		default:
+			return time.Time{}, time.Time{}, fmt.Errorf("invalid preset")
+		}
+	}
+
+	if s := strings.TrimSpace(q.Get("from")); s != "" {
+		t, err := time.Parse(time.RFC3339, s)
+		if err != nil {
+			return time.Time{}, time.Time{}, fmt.Errorf("invalid from; expected RFC3339")
+		}
+		from = t.UTC()
+	}
+	if s := strings.TrimSpace(q.Get("to")); s != "" {
+		t, err := time.Parse(time.RFC3339, s)
+		if err != nil {
+			return time.Time{}, time.Time{}, fmt.Errorf("invalid to; expected RFC3339")
+		}
+		to = t.UTC()
+	}
+	if !from.Before(to) {
+		return time.Time{}, time.Time{}, fmt.Errorf("from must be before to")
+	}
+
+	return from, to, nil
+}
+
 type PopListResponse struct {
 	Items    []models.PopInput `json:"items"`
 	Total    int64             `json:"total"`
@@ -135,6 +177,12 @@ func (h *PopHandler) List(w http.ResponseWriter, r *http.Request) {
 	page, _ := strconv.Atoi(q.Get("page"))
 	pageSize, _ := strconv.Atoi(q.Get("page_size"))
 
+	from, to, err := parseDateRange(q)
+	if err != nil {
+		writeError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+
 	f := repository.PopFilter{
 		City:            q.Get("city"),
 		Region:          q.Get("region"),
@@ -146,6 +194,8 @@ func (h *PopHandler) List(w http.ResponseWriter, r *http.Request) {
 		CampaignID:      q.Get("campaign_id"),
 		PosterCreatedBy: qInt(q, "poster_created_by"),
 		Type:            q.Get("type"),
+		From:            from,
+		To:              to,
 		Page:            page,
 		PageSize:        pageSize,
 	}
@@ -243,32 +293,9 @@ func (h *PopHandler) Trend(w http.ResponseWriter, r *http.Request) {
 		bucket = "day"
 	}
 
-	lastDays := qIntDefault(q, "last_days", 30)
-	if lastDays <= 0 {
-		lastDays = 30
-	}
-
-	to := time.Now().UTC()
-	from := to.AddDate(0, 0, -lastDays)
-
-	if s := strings.TrimSpace(q.Get("from")); s != "" {
-		t, err := time.Parse(time.RFC3339, s)
-		if err != nil {
-			writeError(w, http.StatusBadRequest, "invalid from; expected RFC3339")
-			return
-		}
-		from = t.UTC()
-	}
-	if s := strings.TrimSpace(q.Get("to")); s != "" {
-		t, err := time.Parse(time.RFC3339, s)
-		if err != nil {
-			writeError(w, http.StatusBadRequest, "invalid to; expected RFC3339")
-			return
-		}
-		to = t.UTC()
-	}
-	if !from.Before(to) {
-		writeError(w, http.StatusBadRequest, "from must be before to")
+	from, to, err := parseDateRange(q)
+	if err != nil {
+		writeError(w, http.StatusBadRequest, err.Error())
 		return
 	}
 
@@ -354,32 +381,10 @@ func (h *PopHandler) Stats(w http.ResponseWriter, r *http.Request) {
 	}
 
 	limit := qIntDefault(q, "limit", 10)
-	lastDays := qIntDefault(q, "last_days", 30)
-	if lastDays <= 0 {
-		lastDays = 30
-	}
 
-	to := time.Now().UTC()
-	from := to.AddDate(0, 0, -lastDays)
-
-	if s := strings.TrimSpace(q.Get("from")); s != "" {
-		t, err := time.Parse(time.RFC3339, s)
-		if err != nil {
-			writeError(w, http.StatusBadRequest, "invalid from; expected RFC3339")
-			return
-		}
-		from = t.UTC()
-	}
-	if s := strings.TrimSpace(q.Get("to")); s != "" {
-		t, err := time.Parse(time.RFC3339, s)
-		if err != nil {
-			writeError(w, http.StatusBadRequest, "invalid to; expected RFC3339")
-			return
-		}
-		to = t.UTC()
-	}
-	if !from.Before(to) {
-		writeError(w, http.StatusBadRequest, "from must be before to")
+	from, to, err := parseDateRange(q)
+	if err != nil {
+		writeError(w, http.StatusBadRequest, err.Error())
 		return
 	}
 

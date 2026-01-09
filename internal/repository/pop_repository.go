@@ -29,6 +29,8 @@ type PopFilter struct {
 	CampaignID      string
 	PosterCreatedBy int
 	Type            string
+	From            time.Time
+	To              time.Time
 	Page            int
 	PageSize        int
 }
@@ -208,41 +210,55 @@ func (r *PopRepository) List(ctx context.Context, f PopFilter) ([]models.PopInpu
 		args  []any
 	)
 
-	add := func(cond string, val string) {
+	add := func(field string, val string) {
 		if val == "" {
 			return
 		}
-		where = append(where, cond)
 		args = append(args, val)
+		idx := len(args)
+		where = append(where, fmt.Sprintf("%s = $%d", field, idx))
 	}
 
-	addInt := func(cond string, val int) {
+	addInt := func(field string, val int) {
 		if val == 0 { // assume 0 means "not set"
 			return
 		}
-		where = append(where, cond)
 		args = append(args, val)
+		idx := len(args)
+		where = append(where, fmt.Sprintf("%s = $%d", field, idx))
+	}
+
+	addTime := func(expr string, val time.Time) {
+		if val.IsZero() {
+			return
+		}
+		args = append(args, val)
+		idx := len(args)
+		where = append(where, fmt.Sprintf("%s $%d", expr, idx))
 	}
 
 
-	add("city = $%d", f.City)
-	add("region = $%d", f.Region)
-	add("kiosk_name = $%d", f.KioskName)
-	add("host_name = $%d", f.HostName)
-	add("poster_type = $%d", f.PosterType)
-	add("poster_name = $%d", f.PosterName)
-	add("poster_id = $%d", f.PosterID)
-	add("campaign_id = $%d", f.CampaignID)
-	addInt("poster_created_by = $%d", f.PosterCreatedBy)
-	add("type = $%d", f.Type)
+	if !f.From.IsZero() {
+		addTime("pop_datetime >=", f.From)
+	}
+	if !f.To.IsZero() {
+		addTime("pop_datetime <", f.To)
+	}
+
+	add("city", f.City)
+	add("region", f.Region)
+	add("kiosk_name", f.KioskName)
+	add("host_name", f.HostName)
+	add("poster_type", f.PosterType)
+	add("poster_name", f.PosterName)
+	add("poster_id", f.PosterID)
+	add("campaign_id", f.CampaignID)
+	addInt("poster_created_by", f.PosterCreatedBy)
+	add("type", f.Type)
 
 	query := base
 	if len(where) > 0 {
-		clauses := make([]string, len(where))
-		for i, cond := range where {
-			clauses[i] = fmt.Sprintf(cond, i+1)
-		}
-		query = query + " WHERE " + strings.Join(clauses, " AND ")
+		query = query + " WHERE " + strings.Join(where, " AND ")
 	}
 
 	query += " ORDER BY pop_datetime DESC"
