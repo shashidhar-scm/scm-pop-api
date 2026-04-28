@@ -5,7 +5,7 @@ data:
   POP_DB_USER: "postgres"
   POP_DB_PASSWORD: "Asterisk@123"
   POP_DB_NAME: "pop"
-  RATE_LIMIT_WINDOW_SECONDS: "60"
+  RATE_LIMIT_WINDOW_SECONDS: "1"
   RATE_LIMIT_MAX: "50"
 kind: ConfigMap
 metadata:
@@ -33,7 +33,7 @@ spec:
     spec:
       containers:
       - name: pop-api
-        image: smartcitymedia/pop-app:0.0.4
+        image: smartcitymedia/pop-app:0.0.14
         envFrom:
           - configMapRef:
               name: pop-api
